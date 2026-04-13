@@ -191,7 +191,6 @@ input[type="range"]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;b
       <button class="step-tab" onclick="goTab(2)" id="st2"><span class="step-num">3</span>Export</button>
     </div>
  
-    <!-- TAB 0 -->
     <div class="pane active" id="p0">
       <div class="sec">
         <div class="sec-label">Source Image</div>
@@ -241,7 +240,6 @@ input[type="range"]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;b
       </div>
     </div>
  
-    <!-- TAB 1 -->
     <div class="pane" id="p1">
       <div class="sec">
         <div class="sec-label">Live Preview</div>
@@ -279,7 +277,6 @@ input[type="range"]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;b
       </div>
     </div>
  
-    <!-- TAB 2 -->
     <div class="pane" id="p2">
       <div class="final-wrap">
         <div class="final-sub-tabs">
@@ -291,18 +288,21 @@ input[type="range"]::-moz-range-thumb{width:22px;height:22px;border-radius:50%;b
           <canvas id="finalCanvas" style="display:none;"></canvas>
           <canvas id="origCanvas" style="display:none;"></canvas>
         </div>
-        <div class="dl-row">
-          <button class="dl-btn" id="dlPng" disabled onclick="copyAs('png')">Copy PNG</button>
-          <button class="dl-btn primary" id="dlSvg" disabled onclick="copyAs('svg')">Copy SVG</button>
+        
+        <div class="dl-row" style="padding: 0 20px 8px;">
+          <button class="dl-btn" id="cpPng" disabled onclick="exportAs('png', 'copy')">Copy PNG</button>
+          <button class="dl-btn" id="dlPng" disabled onclick="exportAs('png', 'download')">Download PNG</button>
         </div>
+        <div class="dl-row">
+          <button class="dl-btn primary" id="cpSvg" disabled onclick="exportAs('svg', 'copy')">Copy SVG</button>
+          <button class="dl-btn primary" id="dlSvg" disabled onclick="exportAs('svg', 'download')">Download SVG</button>
+        </div>
+
         <div class="final-footer" id="finalFooter" style="display:none;"><span><span class="dot"></span><span id="infoText">Ready</span></span><span id="dimText"></span></div>
       </div>
       <div class="sec" style="display:flex;gap:8px;"><button class="cta-btn ghost" onclick="goTab(1)">← Back to settings</button></div>
     </div>
   </div></div>
-  <footer style="text-align:center;padding:32px 20px 40px;font-size:12px;color:var(--t3);font-family:var(--fm);letter-spacing:.3px;">
-    © 2026 Ashlen Singh. All rights reserved.
-  </footer>
 </div>
  
 <script>
@@ -484,21 +484,25 @@ function pixelate(){
   if(colorMode==='extract')showExtracted(sd.data);
   $('miniEmpty').style.display='none';$('finalEmpty').style.display='none';$('finalFooter').style.display='flex';
   $('infoText').textContent=`${gx}×${gy} pixels`;$('dimText').textContent=`${dw}×${dh}px`;
-  $('dlPng').disabled=false;$('dlSvg').disabled=false;
+  
+  $('cpPng').disabled=false;$('dlPng').disabled=false;
+  $('cpSvg').disabled=false;$('dlSvg').disabled=false;
 }
  
 function adjustColors(d,sat,con){for(let i=0;i<d.length;i+=4){let r=d[i],g=d[i+1],b=d[i+2];if(sat!==1){const[h,s,l]=rgb2hsl(r,g,b);const[nr,ng,nb]=hsl2rgb(h,Math.min(1,s*sat),l);r=nr;g=ng;b=nb;}if(con!==1){r=cl(((r/255-.5)*con+.5)*255);g=cl(((g/255-.5)*con+.5)*255);b=cl(((b/255-.5)*con+.5)*255);}d[i]=r;d[i+1]=g;d[i+2]=b;}}
 function snapToPalette(d,pal){const pp=pal.map(hexRgb);for(let i=0;i<d.length;i+=4){let mn=Infinity,c=pp[0];for(const p of pp){const dt=(d[i]-p.r)**2+(d[i+1]-p.g)**2+(d[i+2]-p.b)**2;if(dt<mn){mn=dt;c=p;}}d[i]=c.r;d[i+1]=c.g;d[i+2]=c.b;}}
 function showExtracted(d){const cm={};for(let i=0;i<d.length;i+=4){const r=Math.round(d[i]/32)*32,g=Math.round(d[i+1]/32)*32,b=Math.round(d[i+2]/32)*32;const k=`${r},${g},${b}`;cm[k]=(cm[k]||0)+1;}const sorted=Object.entries(cm).sort((a,b)=>b[1]-a[1]).slice(0,16);const sec=$('extractedSection');sec.style.display='flex';sec.innerHTML=sorted.map(([c])=>{const[r,g,b]=c.split(',');return`<div class="ext-sw" style="background:rgb(${r},${g},${b})" title="rgb(${r},${g},${b})"></div>`;}).join('');}
  
-// ══ COPY ══
-async function copyAs(type){
+// ══ EXPORT (Copy & Download) ══
+async function exportAs(type, action){
   if(!pixelData)return;
   const gy=pixelData.length,gx=pixelData[0].length;
   const gP=parseInt(gapSlider.value)/100,rP=parseInt(roundSlider.value)/100;
-  const btn=$(type==='png'?'dlPng':'dlSvg');
+  const btnId = (action === 'copy' ? 'cp' : 'dl') + (type==='png'?'Png':'Svg');
+  const btn=$(btnId);
   const orig=btn.textContent;
- 
+  btn.textContent = action==='copy' ? 'Copying...' : 'Downloading...';
+
   if(type==='png'){
     const expCell=Math.max(8,Math.ceil(1024/Math.max(gx,gy)));
     const ew=gx*expCell,eh=gy*expCell;
@@ -507,27 +511,42 @@ async function copyAs(type){
     const gap=expCell*gP,ps=expCell-gap,rd=(ps/2)*rP;
     ex.fillStyle='#f0f0f0';ex.fillRect(0,0,ew,eh);
     for(let y=0;y<gy;y++)for(let x=0;x<gx;x++){const px=x*expCell+gap/2,py=y*expCell+gap/2;ex.fillStyle=pixelData[y][x];if(rd>0.5){rrect(ex,px,py,ps,ps,rd);ex.fill();}else ex.fillRect(px,py,ps,ps);}
-    try{
-      const blob=await new Promise(r=>ec.toBlob(r,'image/png'));
-      await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
-      btn.textContent='✓ Copied!';
-    }catch(e){btn.textContent='Copy failed';}
-    setTimeout(()=>btn.textContent=orig,2000);
+    
+    if(action === 'download'){
+      const url = ec.toDataURL('image/png');
+      const a = document.createElement('a');a.href = url;a.download = 'pixel-art.png';a.click();
+      btn.textContent='✓ Downloaded!';
+    } else {
+      try{
+        const blob=await new Promise(r=>ec.toBlob(r,'image/png'));
+        await navigator.clipboard.write([new ClipboardItem({'image/png':blob})]);
+        btn.textContent='✓ Copied!';
+      }catch(e){btn.textContent='Copy failed';}
+    }
   } else {
     const cs=16,sw=gx*cs,sh=gy*cs,gap=cs*gP,ps=cs-gap,rad=(ps/2)*rP;
     let s=`<svg xmlns="http://www.w3.org/2000/svg" width="${sw}" height="${sh}" viewBox="0 0 ${sw} ${sh}"><rect width="${sw}" height="${sh}" fill="#f0f0f0"/>`;
     for(let y=0;y<gy;y++)for(let x=0;x<gx;x++){const px=x*cs+gap/2,py=y*cs+gap/2;s+=rad>.1?`<rect x="${px}" y="${py}" width="${ps}" height="${ps}" rx="${rad}" ry="${rad}" fill="${pixelData[y][x]}"/>`:`<rect x="${px}" y="${py}" width="${ps}" height="${ps}" fill="${pixelData[y][x]}"/>`;}
     s+='</svg>';
-    try{
-      await navigator.clipboard.writeText(s);
-      btn.textContent='✓ Copied!';
-    }catch(e){
-      const ta=document.createElement('textarea');ta.value=s;ta.style.position='fixed';ta.style.opacity='0';
-      document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
-      btn.textContent='✓ Copied!';
+    
+    if(action === 'download'){
+      const blob = new Blob([s], {type: 'image/svg+xml'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');a.href = url;a.download = 'pixel-art.svg';a.click();
+      URL.revokeObjectURL(url);
+      btn.textContent='✓ Downloaded!';
+    } else {
+      try{
+        await navigator.clipboard.writeText(s);
+        btn.textContent='✓ Copied!';
+      }catch(e){
+        const ta=document.createElement('textarea');ta.value=s;ta.style.position='fixed';ta.style.opacity='0';
+        document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+        btn.textContent='✓ Copied!';
+      }
     }
-    setTimeout(()=>btn.textContent=orig,2000);
   }
+  setTimeout(()=>btn.textContent=orig,2000);
 }
  
 // Helpers
